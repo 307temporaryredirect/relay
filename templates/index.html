@@ -1,71 +1,70 @@
-
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <title>Gambar Relay Multiplayer</title>
-    <style>canvas { border: 1px solid black; }</style>
+    <title>Relay Gambar</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.1/socket.io.min.js"></script>
 </head>
 <body>
-    <h1>Gambar Relay Multiplayer</h1>
+    <h1>Relay Gambar</h1>
     <input type="text" id="username" placeholder="Username">
     <input type="text" id="room" placeholder="Room">
     <input type="text" id="team" placeholder="Team">
-    <input type="text" id="role" placeholder="Role (player/moderator)">
-    <button onclick="joinRoom()">Join</button><br><br>
-    <canvas id="canvas" width="400" height="400"></canvas><br>
-    <button onclick="sendDrawing()">Kirim</button>
-    <button onclick="addPoints()">Tambah Poin</button><br>
-    <div id="info"></div>
-    <script src="https://cdn.socket.io/4.0.1/socket.io.min.js"></script>
+    <button onclick="joinRoom()">Join Room</button>
+    <canvas id="canvas" width="500" height="500" style="border:1px solid;"></canvas>
+    <button onclick="ambilKuas()">Ambil Kuas</button>
+    <button onclick="kirimGambar()">Kirim Gambar</button>
+
     <script>
         const socket = io();
-        let room="", team="", username="", role="";
-        const canvas = document.getElementById('canvas');
-        const ctx = canvas.getContext('2d');
-        let drawing = false;
-
-        canvas.addEventListener('mousedown', () => drawing = true);
-        canvas.addEventListener('mouseup', () => drawing = false);
-        canvas.addEventListener('mousemove', e => {
-            if (!drawing) return;
-            ctx.fillStyle = 'black';
-            ctx.beginPath();
-            ctx.arc(e.offsetX, e.offsetY, 2, 0, Math.PI*2);
-            ctx.fill();
-        });
+        let room, team, username;
+        let kuasDiambil = false;
+        let timeoutId;
+        let canvas = document.getElementById('canvas');
+        let ctx = canvas.getContext('2d');
 
         function joinRoom() {
             username = document.getElementById('username').value;
             room = document.getElementById('room').value;
             team = document.getElementById('team').value;
-            role = document.getElementById('role').value;
-            socket.emit('join_room', {room, username, team, role});
+            socket.emit('join_room', {room, username, team});
         }
 
-        function sendDrawing() {
-            const image = canvas.toDataURL();
-            socket.emit('send_drawing', {room, team, username, image});
-            ctx.clearRect(0,0,canvas.width,canvas.height);
-        }
-
-        function addPoints() {
-            if (role === "moderator") {
-                const points = parseInt(prompt("Masukkan poin untuk tim " + team));
-                socket.emit('manual_score', {room, team, points});
-            } else {
-                alert("Hanya moderator yang dapat menambahkan poin.");
-            }
-        }
-
-        socket.on('joined_room', data => document.getElementById('info').innerText = data.msg);
-        socket.on('receive_drawing', data => {
-            const img = new Image();
-            img.onload = () => ctx.drawImage(img,0,0);
-            img.src = data.image;
-            document.getElementById('info').innerText = `Next: ${data.next_player}`;
+        canvas.addEventListener('mousedown', () => {
+            if (kuasDiambil) drawing = true;
         });
-        socket.on('update_score', data => alert(`Total poin tim ${data.team}: ${data.total_points}`));
+        canvas.addEventListener('mouseup', () => drawing = false);
+        canvas.addEventListener('mousemove', (e) => {
+            if (drawing) {
+                const x = e.offsetX;
+                const y = e.offsetY;
+                ctx.fillRect(x, y, 2, 2);
+            }
+        });
+
+        function ambilKuas() {
+            kuasDiambil = true;
+            if (timeoutId) clearTimeout(timeoutId);
+            timeoutId = setTimeout(() => {
+                kuasDiambil = false;
+                alert('Kuas otomatis dilepas karena tidak ada gerakan.');
+            }, 3000);
+        }
+
+        function kirimGambar() {
+            const imageData = canvas.toDataURL();
+            socket.emit('send_drawing', {room, team, username, image: imageData});
+            kuasDiambil = false;
+        }
+
+        socket.on('receive_drawing', (data) => {
+            let img = new Image();
+            img.onload = () => ctx.drawImage(img, 0, 0);
+            img.src = data.image;
+            alert(`Giliran ${data.next_player}`);
+        });
+
+        socket.on('joined_room', (data) => alert(data.msg));
+        socket.on('update_score', (data) => alert(`Skor Tim ${data.team}: ${data.total_points}`));
     </script>
 </body>
 </html>
