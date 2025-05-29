@@ -15,56 +15,68 @@
     <button onclick="kirimGambar()">Kirim Gambar</button>
 
     <script>
-        const socket = io();
-        let room, team, username;
-        let kuasDiambil = false;
-        let timeoutId;
-        let canvas = document.getElementById('canvas');
-        let ctx = canvas.getContext('2d');
+    const socket = io();
+    let room, team, username;
+    let kuasDiambil = false;
+    let drawing = false;   // ← Tambahin ini!
+    let timeoutId;
+    let canvas = document.getElementById('canvas');
+    let ctx = canvas.getContext('2d');
 
-        function joinRoom() {
-            username = document.getElementById('username').value;
-            room = document.getElementById('room').value;
-            team = document.getElementById('team').value;
-            socket.emit('join_room', {room, username, team});
+    function joinRoom() {
+        username = document.getElementById('username').value;
+        room = document.getElementById('room').value;
+        team = document.getElementById('team').value;
+        socket.emit('join_room', {room, username, team});
+    }
+
+    canvas.addEventListener('mousedown', () => {
+        if (kuasDiambil) {
+            drawing = true;
+            resetTimeout();  // Reset timer kalau gerakan
         }
-
-        canvas.addEventListener('mousedown', () => {
-            if (kuasDiambil) drawing = true;
-        });
-        canvas.addEventListener('mouseup', () => drawing = false);
-        canvas.addEventListener('mousemove', (e) => {
-            if (drawing) {
-                const x = e.offsetX;
-                const y = e.offsetY;
-                ctx.fillRect(x, y, 2, 2);
-            }
-        });
-
-        function ambilKuas() {
-            kuasDiambil = true;
-            if (timeoutId) clearTimeout(timeoutId);
-            timeoutId = setTimeout(() => {
-                kuasDiambil = false;
-                alert('Kuas otomatis dilepas karena tidak ada gerakan.');
-            }, 3000);
+    });
+    canvas.addEventListener('mouseup', () => drawing = false);
+    canvas.addEventListener('mousemove', (e) => {
+        if (kuasDiambil && drawing) {
+            const x = e.offsetX;
+            const y = e.offsetY;
+            ctx.fillRect(x, y, 2, 2);
+            resetTimeout();  // Reset timer saat menggambar
         }
+    });
 
-        function kirimGambar() {
-            const imageData = canvas.toDataURL();
-            socket.emit('send_drawing', {room, team, username, image: imageData});
+    function resetTimeout() {
+        if (timeoutId) clearTimeout(timeoutId);
+        timeoutId = setTimeout(() => {
             kuasDiambil = false;
-        }
+            drawing = false;
+            alert('Kuas otomatis dilepas karena tidak ada gerakan.');
+        }, 3000);  // 3 detik
+    }
 
-        socket.on('receive_drawing', (data) => {
-            let img = new Image();
-            img.onload = () => ctx.drawImage(img, 0, 0);
-            img.src = data.image;
-            alert(`Giliran ${data.next_player}`);
-        });
+    function ambilKuas() {
+        kuasDiambil = true;
+        alert('Kuas diambil!');
+        resetTimeout();
+    }
 
-        socket.on('joined_room', (data) => alert(data.msg));
-        socket.on('update_score', (data) => alert(`Skor Tim ${data.team}: ${data.total_points}`));
-    </script>
+    function kirimGambar() {
+        const imageData = canvas.toDataURL();
+        socket.emit('send_drawing', {room, team, username, image: imageData});
+        kuasDiambil = false;
+        drawing = false;
+    }
+
+    socket.on('receive_drawing', (data) => {
+        let img = new Image();
+        img.onload = () => ctx.drawImage(img, 0, 0);
+        img.src = data.image;
+        alert(`Giliran ${data.next_player}`);
+    });
+
+    socket.on('joined_room', (data) => alert(data.msg));
+    socket.on('update_score', (data) => alert(`Skor Tim ${data.team}: ${data.total_points}`));
+</script>
 </body>
 </html>
