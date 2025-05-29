@@ -1,4 +1,3 @@
-
 from flask import Flask, render_template, request
 from flask_socketio import SocketIO, emit, join_room
 import time
@@ -56,4 +55,6 @@ def handle_manual_score(data):
     emit('update_score', {'team': team, 'total_points': rooms_data[room]['points'][team]}, room=room)
 
 if __name__ == '__main__':
-    socketio.run(app, debug=True)
+    import os
+    port = int(os.environ.get('PORT', 5000))
+    socketio.run(app, host='0.0.0.0', port=port)
