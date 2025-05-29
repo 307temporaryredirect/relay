@@ -1,0 +1,71 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Gambar Relay Multiplayer</title>
+    <style>canvas { border: 1px solid black; }</style>
+</head>
+<body>
+    <h1>Gambar Relay Multiplayer</h1>
+    <input type="text" id="username" placeholder="Username">
+    <input type="text" id="room" placeholder="Room">
+    <input type="text" id="team" placeholder="Team">
+    <input type="text" id="role" placeholder="Role (player/moderator)">
+    <button onclick="joinRoom()">Join</button><br><br>
+    <canvas id="canvas" width="400" height="400"></canvas><br>
+    <button onclick="sendDrawing()">Kirim</button>
+    <button onclick="addPoints()">Tambah Poin</button><br>
+    <div id="info"></div>
+    <script src="https://cdn.socket.io/4.0.1/socket.io.min.js"></script>
+    <script>
+        const socket = io();
+        let room="", team="", username="", role="";
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        let drawing = false;
+
+        canvas.addEventListener('mousedown', () => drawing = true);
+        canvas.addEventListener('mouseup', () => drawing = false);
+        canvas.addEventListener('mousemove', e => {
+            if (!drawing) return;
+            ctx.fillStyle = 'black';
+            ctx.beginPath();
+            ctx.arc(e.offsetX, e.offsetY, 2, 0, Math.PI*2);
+            ctx.fill();
+        });
+
+        function joinRoom() {
+            username = document.getElementById('username').value;
+            room = document.getElementById('room').value;
+            team = document.getElementById('team').value;
+            role = document.getElementById('role').value;
+            socket.emit('join_room', {room, username, team, role});
+        }
+
+        function sendDrawing() {
+            const image = canvas.toDataURL();
+            socket.emit('send_drawing', {room, team, username, image});
+            ctx.clearRect(0,0,canvas.width,canvas.height);
+        }
+
+        function addPoints() {
+            if (role === "moderator") {
+                const points = parseInt(prompt("Masukkan poin untuk tim " + team));
+                socket.emit('manual_score', {room, team, points});
+            } else {
+                alert("Hanya moderator yang dapat menambahkan poin.");
+            }
+        }
+
+        socket.on('joined_room', data => document.getElementById('info').innerText = data.msg);
+        socket.on('receive_drawing', data => {
+            const img = new Image();
+            img.onload = () => ctx.drawImage(img,0,0);
+            img.src = data.image;
+            document.getElementById('info').innerText = `Next: ${data.next_player}`;
+        });
+        socket.on('update_score', data => alert(`Total poin tim ${data.team}: ${data.total_points}`));
+    </script>
+</body>
+</html>
